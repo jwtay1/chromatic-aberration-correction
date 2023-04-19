@@ -1,7 +1,8 @@
 clearvars
 clc
 
-reader = BioformatsImage('D:\Projects\ALMC Tickets\T17229-Decker-ChromaticCorrection\data\Set 2\230407 W1 100x Argo003.nd2');
+%reader = BioformatsImage('D:\Projects\ALMC Tickets\T17229-Decker-ChromaticCorrection\data\Set 2\230407 W1 100x Argo003.nd2');
+reader = BioformatsImage('D:\Projects\ALMC Tickets\T17229-Decker-ChromaticCorrection\data\Set 2\230407 SoRa 1x 100x Argo.nd2');
 
 %%
 Icy5 = getPlane(reader, 1, 1, 1);
@@ -105,3 +106,5 @@ imwrite(C, '20230418_chromatic_corrected.tif', 'Compression', 'none')
 
 C = imfuse(Icy5norm, Itritcnorm);
 imwrite(C, '20230418_chromatic_original.tif', 'Compression', 'none')
+
+save('20230419_SoRa1x_100x_Cy5Tritc.mat', 'tform')
