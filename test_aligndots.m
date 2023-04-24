@@ -100,11 +100,11 @@ figure(4)
 imshowpair(Icy5norm, Itritcnorm)
 title('Original')
 %%
-%Export images
-C = imfuse(moveCorr, Itritcnorm);
-imwrite(C, '20230418_chromatic_corrected.tif', 'Compression', 'none')
-
-C = imfuse(Icy5norm, Itritcnorm);
-imwrite(C, '20230418_chromatic_original.tif', 'Compression', 'none')
-
-save('20230419_SoRa1x_100x_Cy5Tritc.mat', 'tform')
+% %Export images
+% C = imfuse(moveCorr, Itritcnorm);
+% imwrite(C, '20230418_chromatic_corrected.tif', 'Compression', 'none')
+% 
+% C = imfuse(Icy5norm, Itritcnorm);
+% imwrite(C, '20230418_chromatic_original.tif', 'Compression', 'none')
+% 
+% save('20230419_SoRa1x_100x_Cy5Tritc.mat', 'tform')
