@@ -4,7 +4,8 @@ clc
 CC = ChromaticRegistration;
 
 CC = calculateCorrection(CC, 'D:\Projects\ALMC Tickets\T17229-Decker-ChromaticCorrection\data\ArgoCalibration\230407 SoRa 1x 100x Argo.nd2', ...
-    'Debug', false);
+    'Debug', false, ...
+    'ReferenceChannel', 'SoRa-TRITC');
 return
 
 

@@ -11,14 +11,34 @@ classdef ChromaticRegistration
 
     properties (SetAccess = private)
 
-        corrmatrix
-
-
+        calibrations
+        refchannel = '';
 
     end
     
+    properties (Dependent)
+
+        channelsAvailable
+
+    end
     
     methods
+
+        function chList = get.channelsAvailable(obj)
+            %Get list of calibrated channels
+
+            if ~isempty(obj.calibrations)
+
+                chList = {obj.calibrations.channel};
+
+            else
+
+                chList = '';
+
+            end
+
+
+        end
 
         function obj = calculateCorrection(obj, filepath, varargin)
             %CALCULATECORRECTION  Calculate aberration correction 
@@ -51,20 +71,37 @@ classdef ChromaticRegistration
             addParameter(ip, 'Debug', false);
             parse(ip, varargin{:});
 
-
             for iFile = 1:numel(files)
 
                 %Create a BioformatsImage object
                 reader = BioformatsImage(fullfile(files(iFile).folder, files(iFile).name));
 
-                Iref = getPlane(reader, 1, ip.Results.ReferenceChannel, 1);
+                %Resolve the reference channel name
+                if isempty(obj.refchannel)
+                    if isnumeric(ip.Results.ReferenceChannel)
+                        obj.refchannel = reader.channelNames{ip.Results.ReferenceChannel};                        
+                    else
+                        obj.refchannel = ip.Results.ReferenceChannel;
+                    end                    
+                end
 
-                refMask = obj.segmentObjects(Iref);
-                dataRef = regionprops(refMask, 'Centroid');
-                
+                %Check that the reference channel exists
+                if ~ismember(obj.refchannel, reader.channelNames)
+                    warning('ChromaticRegistration:calculateCorrection:RefChannelMissing', ...
+                        '%s: The specified reference channel %s was not found in the ND2 file.', ...
+                        files(iFile).name, obj.refchannel)
+                    continue;
+                end
+
+                %Get the reference channel image
+                Iref = getPlane(reader, 1, obj.refchannel, 1);
+
+                %Calculate the correction for each channel in the
+                %calibration image
                 for iC = 1:reader.sizeC
 
-                    if iC == ip.Results.ReferenceChannel || strcmpi(reader.channelNames{iC}, ip.Results.ReferenceChannel)
+                    if strcmpi(reader.channelNames{iC}, ip.Results.ReferenceChannel)
+                        %Skip processing if it's the reference channel
                         continue
                     end
 
@@ -75,6 +112,11 @@ classdef ChromaticRegistration
                         case 'dots'
                             %Calibration image contains bright dots (e.g.,
                             %using a calibration target)
+                            
+                            if ~exist('dataRef', 'var')
+                                refMask = obj.segmentObjects(Iref);
+                                dataRef = regionprops(refMask, 'Centroid');
+                            end
 
                             mask = obj.segmentObjects(I);
 
@@ -90,16 +132,7 @@ classdef ChromaticRegistration
                                 quiver(ptsAout(:, 1), ptsBout(:, 2), dd(:, 1), dd(:, 2))
                                 keyboard
                             end
-
                             
-                            % 
-                            % dist = sqrt(sum((cat(1, data.Centroid) - cat(1, dataRef.Centroid)).^2, 2));
-                            % 
-                            % iDel = dist > 10;
-                            % 
-                            % data(iDel, :) = [];
-                            % dataRef(iDel, :) = [];
-
                             %Check that we have a sufficient number of
                             %control points
                             if size(ptsAout, 1) < 10
@@ -112,15 +145,8 @@ classdef ChromaticRegistration
 
                             end
 
-
-
                             %Carry out the registration
                             tform = fitgeotform2d(ptsAout, ptsBout, 'polynomial', 2);
-
-                            % %Correct the moving image
-                            % moveCorr = imwarp(Icy5norm, tform);
-                            %
-                            % tform = fitgeotform2d(posCy5, postritc, 'affine');
 
                             if ip.Results.Debug
                                 %Plot for debugging
@@ -128,13 +154,32 @@ classdef ChromaticRegistration
                                 imshowpair(Icorr, Iref)
                                 keyboard
                             end
-
-                            %Store the displacement matrix
-                            idx = numel(obj.corrmatrix) + 1;
-                            obj.corrmatrix(idx).channel = reader.channelNames{iC};
-                            obj.corrmatrix(idx).tform = tform;
-                            
+                           %TODO: Store the optical magnification settings
                     end
+
+                    %Store the calibration information
+                    idx = numel(obj.calibrations) + 1;
+                    obj.calibrations(idx).channel = reader.channelNames{iC};
+                    obj.calibrations(idx).tform = tform;
+
+                    obj.calibrations(idx).config = obj.getOptConfig(reader);
+
+                    % %Populate metadata if it exists
+                    % if ~isempty(config)
+                    % 
+                    %     if isfield(config, 'objectiveName')
+                    %         obj.calibrations(idx).objectiveName = config.objectiveName;
+                    %     end
+                    % 
+                    %     if isfield(config, 'isSoRa')
+                    %         obj.calibrations(idx).isSoRa = config.isSoRa;
+                    %     end
+                    % 
+                    %     if isfield(config, 'SoRaZoom')
+                    %         obj.calibrations(idx).SoRaZoom = config.SoRaZoom;
+                    %     end
+                    % 
+                    % end
 
                 end
 
@@ -142,55 +187,85 @@ classdef ChromaticRegistration
 
         end
         
+        function Icorr = registerND2(obj, input, iZ, iC, iT, varargin)
+            %REGISTERND2  Register an ND2 file and export the data
+            %
+
+            %Read in the metadata and see if we can match the correction
+            config = getOptConfig(reader);
+
+            %Process each color channel
+            for iC = 1:input.sizeC
+
+                %Read in image
+                I = getPlane(input, 1, iC, 1);
+
+                Icorr = registerImage(obj, I, input.channelNames{iC}, config);
+
+                if iC == 1
+                    imwrite(Icorr, 'test.tif', 'Compression', 'none');
+                else
+                    imwrite(Icorr, 'test.tif', 'Compression', 'none', 'WriteMode', 'append');
+                end
+
+            end
+        end
+
         
-        function varargout = registerImage(obj, input, varargin)
+        function Iout = registerImage(obj, input, channel, varargin)
             %REGISTER  Registers an image using the calculated corrections
             %
             %  CORR = REGISTER(OBJ, IMAGE, CHANNEL) will register a given
             %  input IMAGE. The image CHANNEL should be specified as a
-            %  string (e.g., 'SoRa-TRITC').
+            %  string (e.g., 'SoRa-TRITC'). Note that the calibration must
+            %  exist for the given input channel, otherwise the function
+            %  will throw an error.
+            %
+            %  CORR = REGISTER(OBJ, IMAGE, CHANNEL) will register a given
+            %  input IMAGE. The image CHANNEL should be specified as a
+            %  string (e.g., 'SoRa-TRITC'). Note that the calibration must
+            %  exist for the given input channel, otherwise the function
+            %  will throw an error.
 
-            %TODO:Add error checking
+            %Validate inputs
+            if ~isnumeric(input)
+                error('ChromaticRegistration:registerImage:InputNotNumeric', ...
+                    'The input is not an image.')
+            end
 
-            if isa(input, 'uint16')
-                %Find the correct channel
-                channels = {obj.corrmatrix.channel};
+            if ~exist('channel', 'var')
+                error('ChromaticRegistration:registerImage:MissingChannel', ...
+                    'The channel of the input image must be specified.')
+            end
 
-                chMatch = find(ismember(channels, varargin{1}), 1, 'first');
+            if ~ischar(channel) && ~isstring(channel)
+                error('ChromaticRegistration:registerImage:ChannelNotText', ...
+                    'Input image channel must be specified as a char array or string.')
+            end
+
+            %TODO: Handle the differrent objectives? 
+            
+            %Check if channel is reference
+            if strcmp(channel, obj.refchannel)
+
+                %Do nothing
+                Iout = input;
+            else
+
+                %Find the correct calibration matrix
+                chMatch = find(ismember(obj.channelsAvailable, channel), 1, 'first');
 
                 if isempty(chMatch)
                     %No registration found or is reference channel, so do
                     %nothing.
-                    %TODO: Record reference channel and spit out error instead
-                    varargout{1} = input;
-                    return;
+                    error('ChromaticRegistration:registerImage:CalibrationNotFound', ...
+                        'Calibration matrix for channel %s was not found.', channel);                    
                 end
 
-                varargout{1} = imwarp(input, obj.corrmatrix(chMatch).tform, 'OutputView', imref2d(size(input)));
-
-            elseif isa(input, 'BioformatsImage')
-
-                for iC = 2:input.sizeC
-
-                    I = getPlane(input, 1, iC, 1);
-
-                    Icorr = registerImage(obj, I, input.channelNames{iC});
-
-                    if iC == 1
-                        imwrite(Icorr, 'test.tif', 'Compression', 'none');
-                    else
-                        imwrite(Icorr, 'test.tif', 'Compression', 'none', 'WriteMode', 'append');
-                    end
-
-                end
+                Iout = imwarp(input, obj.calibrations(chMatch).tform, 'OutputView', imref2d(size(input)));
 
             end
-
-            
-
-
-
-            
+           
         end
 
     
@@ -225,8 +300,10 @@ classdef ChromaticRegistration
             %MATCHPOINTS  Match two sets of control points
             %
             %  [Aout, Bout] = matchPoints(A, B) matches two sets of control
-            %  points A and B using a nearest-neighbor approach. 
+            %  points A and B using the Hungarian linear assignment
+            %  algorithm. The maximum matching distance is set to 10.
 
+            %Calculate the distance between each set of points in A and B
             cost = zeros(size(ptsA, 1), size(ptsB, 1));
             for ii = 1:size(ptsA, 1)
                 
@@ -236,29 +313,60 @@ classdef ChromaticRegistration
 
             M = matchpairs(cost, 10);
 
+            %Populate the paired output matrices
             ptsAout = zeros(size(M, 1), 2);
             ptsBout = zeros(size(M, 1), 2);
 
             for ii = 1:size(M, 1)
-
                 ptsAout(ii, :) = ptsA(M(ii, 1), :);
                 ptsBout(ii, :) = ptsB(M(ii, 2), :);
-
             end
-
-
-
-            % keyboard
-
-            
-
-
-
-
 
         end
 
+        function output = getOptConfig(reader)
 
+            if ~isempty(reader.globalMetadata)
+
+                %Try and find objective settings
+                md = char(reader.globalMetadata);
+
+                objName = extractBetween(md, 'wsObjectiveName=', ',');
+
+                %CameraSettings
+                %sOpticalConfigName
+                if ~isempty(objName)
+                    output.objectiveName = objName{1};
+                end
+
+                %Check if the SoRa is in use. If so, get the
+                %magnification
+                optConfig = extractBetween(md, 'sOpticalConfigName=', ',');
+
+                if ~isempty(objName)
+                    if any(strfind(optConfig{:}, 'SoRa'))
+                        output.isSoRa = true;
+
+                        %Look for the magnification
+                        SoRaZoom = extractBetween(md, 'dZoom=', ',');
+
+                        output.SoRaZoom = SoRaZoom{:};
+
+                    else
+
+                        output.isSoRa = false;
+                        output.SoRaZoom = '';
+
+                    end
+                end
+
+            else
+
+                output = [];
+
+            end
+
+        end
 
 
     end
