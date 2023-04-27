@@ -15,13 +15,13 @@ classdef ChromaticRegistration
         refchannel = '';
 
     end
-    
+
     properties (Dependent)
 
         channelsAvailable
 
     end
-    
+
     methods
 
         function chList = get.channelsAvailable(obj)
@@ -41,16 +41,16 @@ classdef ChromaticRegistration
         end
 
         function obj = calculateCorrection(obj, filepath, varargin)
-            %CALCULATECORRECTION  Calculate aberration correction 
+            %CALCULATECORRECTION  Calculate aberration correction
             %
             %  OBJ = CALCULATECORRECTION(OBJ, PATH) will compute the
             %  correction for the chromatic aberration. PATH can be the
             %  file path to a single ND2 image file or a directory
             %  containing ND2 files. The calculated correction matrices
             %  will be stored in the corrmatrix property.
-            
+
             %Check that filepath is valid
-            if exist(filepath, 'file')                
+            if exist(filepath, 'file')
 
                 [files.folder, fn, ext] = fileparts(filepath);
                 files.name = [fn, ext];
@@ -79,10 +79,10 @@ classdef ChromaticRegistration
                 %Resolve the reference channel name
                 if isempty(obj.refchannel)
                     if isnumeric(ip.Results.ReferenceChannel)
-                        obj.refchannel = reader.channelNames{ip.Results.ReferenceChannel};                        
+                        obj.refchannel = reader.channelNames{ip.Results.ReferenceChannel};
                     else
                         obj.refchannel = ip.Results.ReferenceChannel;
-                    end                    
+                    end
                 end
 
                 %Check that the reference channel exists
@@ -112,7 +112,7 @@ classdef ChromaticRegistration
                         case 'dots'
                             %Calibration image contains bright dots (e.g.,
                             %using a calibration target)
-                            
+
                             if ~exist('dataRef', 'var')
                                 refMask = obj.segmentObjects(Iref);
                                 dataRef = regionprops(refMask, 'Centroid');
@@ -122,7 +122,7 @@ classdef ChromaticRegistration
 
                             %Measure the data
                             data = regionprops(mask, 'Centroid');
-                            
+
                             %Remove any mismatched positions
                             [ptsAout, ptsBout] = obj.matchPoints(cat(1, data.Centroid), cat(1, dataRef.Centroid));
 
@@ -132,7 +132,7 @@ classdef ChromaticRegistration
                                 quiver(ptsAout(:, 1), ptsBout(:, 2), dd(:, 1), dd(:, 2))
                                 keyboard
                             end
-                            
+
                             %Check that we have a sufficient number of
                             %control points
                             if size(ptsAout, 1) < 10
@@ -154,7 +154,7 @@ classdef ChromaticRegistration
                                 imshowpair(Icorr, Iref)
                                 keyboard
                             end
-                           %TODO: Store the optical magnification settings
+                            %TODO: Store the optical magnification settings
                     end
 
                     %Store the calibration information
@@ -166,19 +166,19 @@ classdef ChromaticRegistration
 
                     % %Populate metadata if it exists
                     % if ~isempty(config)
-                    % 
+                    %
                     %     if isfield(config, 'objectiveName')
                     %         obj.calibrations(idx).objectiveName = config.objectiveName;
                     %     end
-                    % 
+                    %
                     %     if isfield(config, 'isSoRa')
                     %         obj.calibrations(idx).isSoRa = config.isSoRa;
                     %     end
-                    % 
+                    %
                     %     if isfield(config, 'SoRaZoom')
                     %         obj.calibrations(idx).SoRaZoom = config.SoRaZoom;
                     %     end
-                    % 
+                    %
                     % end
 
                 end
@@ -186,32 +186,81 @@ classdef ChromaticRegistration
             end
 
         end
-        
-        function Icorr = registerND2(obj, input, iZ, iC, iT, varargin)
+
+        function registerND2(obj, filepath, varargin)
             %REGISTERND2  Register an ND2 file and export the data
             %
 
-            %Read in the metadata and see if we can match the correction
-            config = getOptConfig(reader);
+            % %Read in the metadata and see if we can match the correction
+            % config = getOptConfig(reader);
 
-            %Process each color channel
-            for iC = 1:input.sizeC
+            reader = BioformatsImage(filepath);
 
-                %Read in image
-                I = getPlane(input, 1, iC, 1);
+            header = ['ImageJ=1.52p' newline ...
+                'images=' num2str(3*reader.sizeC) newline...
+                'channels=' num2str(reader.sizeC) newline...
+                'slices=' num2str(3) newline...
+                'hyperstack=true' newline...
+                'mode=color' newline...
+                'loop=false' newline...
+                'min=0.0' newline...
+                'max=65535.0' newline];  % change this to 256 if you use an 8bit image
 
-                Icorr = registerImage(obj, I, input.channelNames{iC}, config);
+            %https://www.mathworks.com/matlabcentral/answers/389765-how-can-i-save-an-image-with-four-channels-or-more-into-an-imagej-compatible-tiff-format
 
-                if iC == 1
-                    imwrite(Icorr, 'test.tif', 'Compression', 'none');
-                else
-                    imwrite(Icorr, 'test.tif', 'Compression', 'none', 'WriteMode', 'append');
+            %Also note: This TIFF file can only be opened using BioFormats
+            %Imported in Fiji. Due to Fiji not supporting TIFF baseline
+            %format.
+            %https://stackoverflow.com/questions/33405242/creating-a-stacked-tiff-file-causes-image-offset
+            tObj = Tiff('test.tif', 'w');
+            tagstruct.ImageLength = reader.height;
+            tagstruct.ImageWidth = reader.width;
+            tagstruct.Photometric = Tiff.Photometric.MinIsBlack;
+            tagstruct.BitsPerSample = 16;
+            tagstruct.SamplesPerPixel = 1;
+            tagstruct.Compression = Tiff.Compression.None;
+            tagstruct.PlanarConfiguration = Tiff.PlanarConfiguration.Chunky;
+            tagstruct.SampleFormat = Tiff.SampleFormat.UInt;
+            tagstruct.ImageDescription = header;
+
+            for iZ = 20:22%reader.sizeZ
+                %storeFrame = zeros(reader.height, reader.width, reader.sizeC, 'uint16');
+
+                for iC = 1:reader.sizeC
+
+                    %Read in image
+                    I = getPlane(reader, iZ, iC, 1);
+
+                    %storeFrame(:, :, iC) = registerImage(obj, I, reader.channelNames{iC});
+
+                    % if size(storeFrame(:, :, iC)) ~= [reader.height, reader.width]
+                    %     keyboard
+                    %
+                    % end
+
+                    tObj.setTag(tagstruct);
+                    Icorr = registerImage(obj, I, reader.channelNames{iC});
+                    if iC == 1
+                        imshow(Icorr, [])
+                        keyboard
+                    end
+
+                    tObj.write(Icorr);
+                    tObj.writeDirectory();
                 end
 
+                % if iZ == 1
+                %     imwrite(storeFrame, 'test.tif', 'Compression', 'none');
+                % else
+                %     imwrite(storeFrame, 'test.tif', 'Compression', 'none', 'WriteMode', 'append');
+                % end
             end
+            tObj.close();
+
+
         end
 
-        
+
         function Iout = registerImage(obj, input, channel, varargin)
             %REGISTER  Registers an image using the calculated corrections
             %
@@ -243,8 +292,8 @@ classdef ChromaticRegistration
                     'Input image channel must be specified as a char array or string.')
             end
 
-            %TODO: Handle the differrent objectives? 
-            
+            %TODO: Handle the differrent objectives?
+
             %Check if channel is reference
             if strcmp(channel, obj.refchannel)
 
@@ -259,17 +308,21 @@ classdef ChromaticRegistration
                     %No registration found or is reference channel, so do
                     %nothing.
                     error('ChromaticRegistration:registerImage:CalibrationNotFound', ...
-                        'Calibration matrix for channel %s was not found.', channel);                    
+                        'Calibration matrix for channel %s was not found.', channel);
                 end
 
                 Iout = imwarp(input, obj.calibrations(chMatch).tform, 'OutputView', imref2d(size(input)));
 
+                if size(Iout) ~= size(input)
+                    error('Output not same size.')
+                end
+
             end
-           
+
         end
 
-    
-    
+
+
     end
 
     methods (Static, Hidden)
@@ -291,7 +344,7 @@ classdef ChromaticRegistration
             %Exclude central region - we might need a better way to do this
             % mask(:, 1:100) = false;
             % mask(2170:end, :) = false;
-            % 
+            %
             % mask(1067:1253, 1049:1274) = false;
 
         end
@@ -306,7 +359,7 @@ classdef ChromaticRegistration
             %Calculate the distance between each set of points in A and B
             cost = zeros(size(ptsA, 1), size(ptsB, 1));
             for ii = 1:size(ptsA, 1)
-                
+
                 cost(ii, :) = sqrt(sum((ptsA(ii,:) - ptsB).^2, 2));
 
             end
