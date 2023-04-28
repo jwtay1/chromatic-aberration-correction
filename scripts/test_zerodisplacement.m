@@ -36,7 +36,6 @@ imshow(Icorr - I, [])
 
 
 fixedPts = [10 20; 10 5; 2 3; 1 1; 8 10; 10 10];
-tformPolynomial = images.geotrans.PolynomialTransformation2D(fixedPts,fixedPts,2)
-
+[
 movingPointsEstimated = transformPointsInverse(tformPolynomial,fixedPts)
 
