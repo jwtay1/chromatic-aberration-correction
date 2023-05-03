@@ -208,9 +208,18 @@ classdef ChromaticRegistration
                     'No calibrations exist in object. Run calculateCorrection first.')            
             end
 
-            if ~exist(filepath, 'file')
+            if isfile(filepath)
+                [fpath, fname, fext] = fileparts(filepath);
+                files.folder = fpath;
+                files.name = [fname, fext];
+
+            elseif isfolder(filepath)
+
+                files = dir(fullfile(filepath, '*.nd2'));
+
+            else
                 error('ChromaticRegistration:registerND2:InvalidFile', ...
-                    '%s does not exist.', filepath)  
+                    '%s is not a valid file or folder.', filepath)  
             end
 
             if ~exist('outputDir', 'var')
@@ -222,58 +231,60 @@ classdef ChromaticRegistration
                 mkdir(outputDir);
             end
 
-            %Open a reader
-            reader = BioformatsImage(filepath);
 
-            %Process inputs
-            ip = inputParser;
-            addParameter(ip, 'zRange', 1:reader.sizeZ);
-            addParameter(ip, 'cRange', 1:reader.sizeC);
-            addParameter(ip, 'tRange', 1:reader.sizeT);
-            parse(ip, varargin{:})
+            for iF = 1:numel(files)
 
-            %Create the ImageDescription string
-            imgDescStr = obj.makeImageDescription_Fiji(...
-                numel(ip.Results.zRange), ...
-                numel(ip.Results.cRange), ...
-                numel(ip.Results.tRange));
+                %Open a reader
+                reader = BioformatsImage(fullfile(files(iF).folder, files(iF).name));
 
-            [~, fn] = fileparts(filepath);
+                %Process inputs
+                ip = inputParser;
+                addParameter(ip, 'zRange', 1:reader.sizeZ);
+                addParameter(ip, 'cRange', 1:reader.sizeC);
+                addParameter(ip, 'tRange', 1:reader.sizeT);
+                parse(ip, varargin{:})
 
-            %Create a new TIFF
-            tiffObj = Tiff(fullfile(outputDir, [fn, '.tif']), 'w');
-            tagstruct.ImageLength = reader.height;
-            tagstruct.ImageWidth = reader.width;
-            tagstruct.Photometric = Tiff.Photometric.MinIsBlack;
-            tagstruct.BitsPerSample = 16;
-            tagstruct.SamplesPerPixel = 1;
-            tagstruct.Compression = Tiff.Compression.None;
-            tagstruct.PlanarConfiguration = Tiff.PlanarConfiguration.Chunky;
-            tagstruct.SampleFormat = Tiff.SampleFormat.UInt;
-            tagstruct.ImageDescription = imgDescStr;
+                %Create the ImageDescription string
+                imgDescStr = obj.makeImageDescription_Fiji(...
+                    numel(ip.Results.zRange), ...
+                    numel(ip.Results.cRange), ...
+                    numel(ip.Results.tRange));
 
-            for iT = ip.Results.tRange                
-                for iZ = ip.Results.zRange
-                    for iC = 1:reader.sizeC
+                %Create a new TIFF
+                tiffObj = Tiff(fullfile(outputDir, [files(iF).name, '.tif']), 'w');
+                tagstruct.ImageLength = reader.height;
+                tagstruct.ImageWidth = reader.width;
+                tagstruct.Photometric = Tiff.Photometric.MinIsBlack;
+                tagstruct.BitsPerSample = 16;
+                tagstruct.SamplesPerPixel = 1;
+                tagstruct.Compression = Tiff.Compression.None;
+                tagstruct.PlanarConfiguration = Tiff.PlanarConfiguration.Chunky;
+                tagstruct.SampleFormat = Tiff.SampleFormat.UInt;
+                tagstruct.ImageDescription = imgDescStr;
 
-                        %Read in image
-                        I = getPlane(reader, iZ, iC, iT);
+                for iT = ip.Results.tRange
+                    for iZ = ip.Results.zRange
+                        for iC = 1:reader.sizeC
 
-                        %Set image tag
-                        tiffObj.setTag(tagstruct);
+                            %Read in image
+                            I = getPlane(reader, iZ, iC, iT);
 
-                        %Register the image
-                        Icorr = registerImage(obj, I, reader.channelNames{iC});
+                            %Set image tag
+                            tiffObj.setTag(tagstruct);
 
-                        %Write the current image to TIFF
-                        tiffObj.write(Icorr);
+                            %Register the image
+                            Icorr = registerImage(obj, I, reader.channelNames{iC});
 
-                        %Move to next page
-                        tiffObj.writeDirectory();
+                            %Write the current image to TIFF
+                            tiffObj.write(Icorr);
+
+                            %Move to next page
+                            tiffObj.writeDirectory();
+                        end
                     end
                 end
+                tiffObj.close();
             end
-            tiffObj.close();
 
         end
 
