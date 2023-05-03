@@ -1,13 +1,13 @@
 <deployment-project plugin="plugin.toolbox" plugin-version="1.0">
-  <configuration file="D:\Projects\ALMC Tickets\T17229-Decker-ChromaticCorrection\code\build\Chromatic Aberration Correction Toolbox.prj" location="D:\Projects\ALMC Tickets\T17229-Decker-ChromaticCorrection\code\build" name="Chromatic Aberration Correction Toolbox" target="target.toolbox" target-name="Package Toolbox">
+  <configuration build-checksum="47776923" file="D:\Projects\ALMC Tickets\T17229-Decker-ChromaticCorrection\code\build\Chromatic Aberration Correction Toolbox.prj" location="D:\Projects\ALMC Tickets\T17229-Decker-ChromaticCorrection\code\build" name="Chromatic Aberration Correction Toolbox" target="target.toolbox" target-name="Package Toolbox">
     <param.appname>Chromatic Aberration Correction Toolbox</param.appname>
     <param.authnamewatermark>Jian Wei Tay</param.authnamewatermark>
     <param.email>jian.tay@colorado.edu</param.email>
     <param.company>BioFrontiers Institute, CU Boulder</param.company>
     <param.summary>Correct chromatic aberrations in microscope images</param.summary>
     <param.description>This toolbox will measure and correct for chromatic aberrations in microscope images.</param.description>
-    <param.screenshot />
-    <param.version>0.9.1</param.version>
+    <param.screenshot>${PROJECT_ROOT}\icon.png</param.screenshot>
+    <param.version>0.9.2</param.version>
     <param.output>${PROJECT_ROOT}\Chromatic Aberration Correction Toolbox.mltbx</param.output>
     <param.products.name />
     <param.products.id />
@@ -47,7 +47,6 @@
     <unset>
       <param.authnamewatermark />
       <param.email />
-      <param.screenshot />
       <param.output />
       <param.products.name />
       <param.products.id />
