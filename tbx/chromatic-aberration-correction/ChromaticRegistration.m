@@ -227,7 +227,7 @@ classdef ChromaticRegistration
             end
 
             %Create output directory if it doesn't exist
-            if ~exist(outputDir, 'dir')
+            if ~isfolder(outputDir)
                 mkdir(outputDir);
             end
 
