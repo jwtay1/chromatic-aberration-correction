@@ -33,6 +33,14 @@ registerND2(CR, D:\For_Carolyn_20230302_slide119_1.nd2, 'D:\test');
 save('SoRa_1x_obj_100x.mat', 'CR');
 ```
 
+To export the file as a series of TIFF files compatible with Imaris, set the ``OutputFormat`` to ``ImarisTiff``:
+
+```matlab
+%Apply the correction to an image, exporting as a Fiji compatible TIFF-stack
+registerND2(CR, D:\For_Carolyn_20230302_slide119_1.nd2, 'D:\test', 'OutputFormat', 'ImarisTiff');
+```
+
+
 ## Contribute
 
 ### Bug reports and feature requests
