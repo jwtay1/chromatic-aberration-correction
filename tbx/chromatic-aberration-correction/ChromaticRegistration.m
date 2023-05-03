@@ -53,10 +53,10 @@ classdef ChromaticRegistration
             %  will set the name of the reference channel. CH can be a
             %  number or a string of the channel name.
             % 
-            %  The calibration images must have the same channels using the
-            %  same optical configurations that you intend to image later.
-            %  Additionally, the images must have at least 10 objects that
-            %  can be used for the registration.
+            %  The calibration images must have the same channel names
+            %  using the same optical configurations that you intend to
+            %  image later. Additionally, the images must have at least 10
+            %  objects that can be used for the registration.
             % 
             %  The calibrations are calculated by fitting the detected
             %  locations of the points using a 2D geometric transformation.
@@ -207,7 +207,7 @@ classdef ChromaticRegistration
             %
             %  REGISTERND2(..., 'OutputFormat', 'ImarisTiff') will produce
             %  a series of TIFF files which are compatible for import with
-            %  Imaris.
+            %  the Imaris File Converter tool.
 
             %Check if calibrations exist
             if isempty(obj.calibrations)
