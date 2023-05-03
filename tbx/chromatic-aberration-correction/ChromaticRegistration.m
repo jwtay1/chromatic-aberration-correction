@@ -196,11 +196,18 @@ classdef ChromaticRegistration
             %  directory. The TIFF file is compatible with Fiji/ImageJ's
             %  BioFormats reader.
             %
+            %  REGISTERND2(OBJ, PATH, OUTPUTDIR) will register all ND2
+            %  files in the directory PATH.
+            %
             %  Note that the output TIFF file must be opened using
             %  BioFormats Importer in Fiji (File > Import > Bio-Formats).
             %  This is because ImageJ does not natively support the TIFF
             %  baseline specifications. If you do not use this importer,
             %  different frames in the image may appear to be "shifted".
+            %
+            %  REGISTERND2(..., 'OutputFormat', 'ImarisTiff') will produce
+            %  a series of TIFF files which are compatible for import with
+            %  Imaris.
 
             %Check if calibrations exist
             if isempty(obj.calibrations)
@@ -237,55 +244,90 @@ classdef ChromaticRegistration
                 %Open a reader
                 reader = BioformatsImage(fullfile(files(iF).folder, files(iF).name));
 
-                %Process inputs
+                %Parse input variables
                 ip = inputParser;
                 addParameter(ip, 'zRange', 1:reader.sizeZ);
                 addParameter(ip, 'cRange', 1:reader.sizeC);
                 addParameter(ip, 'tRange', 1:reader.sizeT);
-                parse(ip, varargin{:})
+                addParameter(ip, 'OutputFormat', 'FijiTiff');
+                parse(ip, varargin{:});
 
-                %Create the ImageDescription string
-                imgDescStr = obj.makeImageDescription_Fiji(...
-                    numel(ip.Results.zRange), ...
-                    numel(ip.Results.cRange), ...
-                    numel(ip.Results.tRange));
+                [~, outputFN] = fileparts(files(iF).name);
 
-                %Create a new TIFF
-                tiffObj = Tiff(fullfile(outputDir, [files(iF).name, '.tif']), 'w');
-                tagstruct.ImageLength = reader.height;
-                tagstruct.ImageWidth = reader.width;
-                tagstruct.Photometric = Tiff.Photometric.MinIsBlack;
-                tagstruct.BitsPerSample = 16;
-                tagstruct.SamplesPerPixel = 1;
-                tagstruct.Compression = Tiff.Compression.None;
-                tagstruct.PlanarConfiguration = Tiff.PlanarConfiguration.Chunky;
-                tagstruct.SampleFormat = Tiff.SampleFormat.UInt;
-                tagstruct.ImageDescription = imgDescStr;
+                switch ip.Results.OutputFormat
 
-                for iT = ip.Results.tRange
-                    for iZ = ip.Results.zRange
-                        for iC = 1:reader.sizeC
+                    case 'FijiTiff'
 
-                            %Read in image
-                            I = getPlane(reader, iZ, iC, iT);
+                        %Create the ImageDescription string
+                        imgDescStr = obj.makeImageDescription_Fiji(...
+                            numel(ip.Results.zRange), ...
+                            numel(ip.Results.cRange), ...
+                            numel(ip.Results.tRange));
 
-                            %Set image tag
-                            tiffObj.setTag(tagstruct);
+                        %Create a new TIFF
+                        tiffObj = Tiff(fullfile(outputDir, [outputFN, '.tif']), 'w');
+                        tagstruct.ImageLength = reader.height;
+                        tagstruct.ImageWidth = reader.width;
+                        tagstruct.Photometric = Tiff.Photometric.MinIsBlack;
+                        tagstruct.BitsPerSample = 16;
+                        tagstruct.SamplesPerPixel = 1;
+                        tagstruct.Compression = Tiff.Compression.None;
+                        tagstruct.PlanarConfiguration = Tiff.PlanarConfiguration.Chunky;
+                        tagstruct.SampleFormat = Tiff.SampleFormat.UInt;
+                        tagstruct.ImageDescription = imgDescStr;
 
-                            %Register the image
-                            Icorr = registerImage(obj, I, reader.channelNames{iC});
+                        for iT = ip.Results.tRange
+                            for iZ = ip.Results.zRange
+                                for iC = 1:reader.sizeC
 
-                            %Write the current image to TIFF
-                            tiffObj.write(Icorr);
+                                    %Read in image
+                                    I = getPlane(reader, iZ, iC, iT);
 
-                            %Move to next page
-                            tiffObj.writeDirectory();
+                                    %Set image tag
+                                    tiffObj.setTag(tagstruct);
+
+                                    %Register the image
+                                    Icorr = registerImage(obj, I, reader.channelNames{iC});
+
+                                    %Write the current image to TIFF
+                                    tiffObj.write(Icorr);
+
+                                    %Move to next page
+                                    tiffObj.writeDirectory();
+                                end
+                            end
                         end
-                    end
-                end
-                tiffObj.close();
-            end
+                        tiffObj.close();
 
+                    case 'ImarisTiff'
+
+                        % %To avoid confusing Imaris, strip any underscores
+                        % %in the original image filename
+                        % outputFN = erase(outputFN, '_');
+
+                        for iT = ip.Results.tRange
+                            for iZ = ip.Results.zRange
+                                for iC = 1:reader.sizeC
+
+                                    %Read in image
+                                    I = getPlane(reader, iZ, iC, iT);
+
+                                    %Register the image
+                                    Icorr = registerImage(obj, I, reader.channelNames{iC});
+
+                                    %imageFilename_C0_Z000_FRAME
+                                    imwrite(Icorr, ...
+                                        fullfile(outputDir, ...
+                                        sprintf('%s__T%03.0f_C%02.0f_Z%03.0f.tif', outputFN, iT - 1, iC - 1, iZ - 1)), ...
+                                        'Compression', 'None');
+
+                                end
+                            end
+                        end                       
+                
+
+                end
+            end
         end
 
         function Iout = registerImage(obj, input, channel, varargin)
