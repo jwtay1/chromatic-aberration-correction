@@ -1,7 +1,7 @@
 # Welcome to the Chromatic Aberration Correction Toolbox!
 
 This toolbox attempts to determine a correction matrix to fix chromatic 
-aberration in microscope images. 
+aberration in microscope images. This project was a collaboration with the Parker lab.
 
 ## Features
 - Calculates corrections between images captured in different channels
@@ -10,7 +10,7 @@ aberration in microscope images.
 
 ## Installation and Usage
 
-[Download](https://github.com/jwtay1/chromatic-aberration-correction/releases) the latest release. **You do not need to download this repository to use the code.** 
+[Download](https://github.com/Biofrontiers-ALMC/chromatic-aberration-correction/releases) the latest release. **You do not need to download this repository to use the code.** 
 
 You will also need to download the Bioformats Image Toolbox (v1.2.1+):
 * [Bioformats MATLAB](https://github.com/Biofrontiers-ALMC/bioformats-matlab/releases)
@@ -40,17 +40,6 @@ To export the file as a series of TIFF files compatible with Imaris, set the ``O
 registerND2(CR, D:\For_Carolyn_20230302_slide119_1.nd2, 'D:\test', 'OutputFormat', 'ImarisTiff');
 ```
 
+#### Authors
 
-## Contribute
-
-### Bug reports and feature requests
-
-Please use the [Issue Tracker](https://github.com/jwtay1/chromatic-aberration-correction/issues) to file a bug report or to request new features.
-
-### Source code
-
-- The source code can be cloned from this repository
-```git
-git clone git@github.com:jwtay1/chromatic-aberration-correction.git
-```
-- The directory of the Git repository is arranged according to the best practices described in [this MathWorks blog post](https://blogs.mathworks.com/developer/2017/01/13/matlab-toolbox-best-practices/).
+This toolbox was developed by Dr. Jian Wei Tay (jian.tay@colorado.edu).
